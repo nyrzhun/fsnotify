@@ -272,48 +272,6 @@ func TestInotifyStress(t *testing.T) {
 	}
 }
 
-func TestInotifyRemoveTwice(t *testing.T) {
-	testDir := tempMkdir(t)
-	defer os.RemoveAll(testDir)
-	testFile := filepath.Join(testDir, "testfile")
-
-	handle, err := os.Create(testFile)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-	handle.Close()
-
-	w, err := NewWatcher(DefaultFlags)
-	if err != nil {
-		t.Fatalf("Failed to create watcher: %v", err)
-	}
-	defer w.Close()
-
-	err = w.Add(testFile)
-	if err != nil {
-		t.Fatalf("Failed to add testFile: %v", err)
-	}
-
-	err = w.Remove(testFile)
-	if err != nil {
-		t.Fatalf("wanted successful remove but got: %v", err)
-	}
-
-	err = w.Remove(testFile)
-	if err == nil {
-		t.Fatalf("no error on removing invalid file")
-	}
-
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if len(w.watches) != 0 {
-		t.Fatalf("Expected watches len is 0, but got: %d, %v", len(w.watches), w.watches)
-	}
-	if len(w.paths) != 0 {
-		t.Fatalf("Expected paths len is 0, but got: %d, %v", len(w.paths), w.paths)
-	}
-}
-
 func TestInotifyInnerMapLength(t *testing.T) {
 	testDir := tempMkdir(t)
 	defer os.RemoveAll(testDir)
@@ -350,9 +308,6 @@ func TestInotifyInnerMapLength(t *testing.T) {
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if len(w.watches) != 0 {
-		t.Fatalf("Expected watches len is 0, but got: %d, %v", len(w.watches), w.watches)
-	}
 	if len(w.paths) != 0 {
 		t.Fatalf("Expected paths len is 0, but got: %d, %v", len(w.paths), w.paths)
 	}

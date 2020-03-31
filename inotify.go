@@ -8,7 +8,6 @@ package fsnotify
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -30,7 +29,6 @@ type Watcher struct {
 	mu       sync.Mutex // Map access
 	fd       int
 	poller   *fdPoller
-	watches  map[string]*watch // Map of inotify watches (key: path)
 	paths    map[int]string    // Map of watched paths (key: watch descriptor)
 	done     chan struct{}     // Channel for sending a "quit message" to the reader goroutine
 	doneResp chan struct{}     // Channel to respond to Close
@@ -53,7 +51,6 @@ func NewWatcher(flags uint32) (*Watcher, error) {
 	w := &Watcher{
 		fd:       fd,
 		poller:   poller,
-		watches:  make(map[string]*watch),
 		paths:    make(map[int]string),
 		Events:   make(chan Event),
 		Errors:   make(chan error),
@@ -104,62 +101,11 @@ func (w *Watcher) Add(name string) error {
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	watchEntry := w.watches[name]
-	if watchEntry != nil {
-		flags |= watchEntry.flags | unix.IN_MASK_ADD
-	}
 	wd, errno := unix.InotifyAddWatch(w.fd, name, flags)
 	if wd == -1 {
 		return errno
 	}
-
-	if watchEntry == nil {
-		w.watches[name] = &watch{wd: uint32(wd), flags: flags}
-		w.paths[wd] = name
-	} else {
-		watchEntry.wd = uint32(wd)
-		watchEntry.flags = flags
-	}
-
-	return nil
-}
-
-// Remove stops watching the named file or directory (non-recursively).
-func (w *Watcher) Remove(name string) error {
-	name = filepath.Clean(name)
-
-	// Fetch the watch.
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	watch, ok := w.watches[name]
-
-	// Remove it from inotify.
-	if !ok {
-		return fmt.Errorf("can't remove non-existent inotify watch for: %s", name)
-	}
-
-	// We successfully removed the watch if InotifyRmWatch doesn't return an
-	// error, we need to clean up our internal state to ensure it matches
-	// inotify's kernel state.
-	delete(w.paths, int(watch.wd))
-	delete(w.watches, name)
-
-	// inotify_rm_watch will return EINVAL if the file has been deleted;
-	// the inotify will already have been removed.
-	// watches and pathes are deleted in ignoreLinux() implicitly and asynchronously
-	// by calling inotify_rm_watch() below. e.g. readEvents() goroutine receives IN_IGNORE
-	// so that EINVAL means that the wd is being rm_watch()ed or its file removed
-	// by another thread and we have not received IN_IGNORE event.
-	success, errno := unix.InotifyRmWatch(w.fd, watch.wd)
-	if success == -1 {
-		// TODO: Perhaps it's not helpful to return an error here in every case.
-		// the only two possible errors are:
-		// EBADF, which happens when w.fd is not a valid file descriptor of any kind.
-		// EINVAL, which is when fd is not an inotify descriptor or wd is not a valid watch descriptor.
-		// Watch descriptors are invalidated when they are removed explicitly or implicitly;
-		// explicitly by inotify_rm_watch, implicitly when the file they are watching is deleted.
-		return errno
-	}
+	w.paths[wd] = name
 
 	return nil
 }
@@ -268,7 +214,6 @@ func (w *Watcher) readEvents() {
 			// automatically.
 			if ok && mask&unix.IN_DELETE_SELF == unix.IN_DELETE_SELF {
 				delete(w.paths, int(raw.Wd))
-				delete(w.watches, name)
 			}
 			w.mu.Unlock()
 
