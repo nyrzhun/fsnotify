@@ -29,10 +29,10 @@ type Watcher struct {
 	mu       sync.Mutex // Map access
 	fd       int
 	poller   *fdPoller
-	paths    map[int]string    // Map of watched paths (key: watch descriptor)
-	done     chan struct{}     // Channel for sending a "quit message" to the reader goroutine
-	doneResp chan struct{}     // Channel to respond to Close
-	flags uint32
+	paths    map[int]string // Map of watched paths (key: watch descriptor)
+	done     chan struct{}  // Channel for sending a "quit message" to the reader goroutine
+	doneResp chan struct{}  // Channel to respond to Close
+	flags    uint32
 }
 
 // NewWatcher establishes a new watcher with the underlying OS and begins waiting for events.
@@ -56,7 +56,7 @@ func NewWatcher(flags uint32) (*Watcher, error) {
 		Errors:   make(chan error),
 		done:     make(chan struct{}),
 		doneResp: make(chan struct{}),
-		flags: flags | unix.IN_DELETE_SELF,
+		flags:    flags | unix.IN_DELETE_SELF,
 	}
 
 	go w.readEvents()
@@ -265,13 +265,16 @@ func (e *Event) ignoreLinux(mask uint32) bool {
 // newEvent returns an platform-independent Event based on an inotify mask.
 func newEvent(name string, mask uint32) Event {
 	e := Event{Name: name, File: nil}
-	if mask&unix.IN_CREATE == unix.IN_CREATE || mask&unix.IN_MOVED_TO == unix.IN_MOVED_TO {
+	if mask&unix.IN_CREATE == unix.IN_CREATE {
 		e.Op |= Create
+	}
+	if mask&unix.IN_MOVED_TO == unix.IN_MOVED_TO {
+		e.Op |= Moved
 	}
 	if mask&unix.IN_DELETE_SELF == unix.IN_DELETE_SELF || mask&unix.IN_DELETE == unix.IN_DELETE {
 		e.Op |= Remove
 	}
-	if mask&unix.IN_MODIFY == unix.IN_MODIFY {
+	if mask&unix.IN_MODIFY == unix.IN_MODIFY || mask&unix.IN_CLOSE_WRITE == unix.IN_CLOSE_WRITE {
 		e.Op |= Write
 	}
 	if mask&unix.IN_MOVE_SELF == unix.IN_MOVE_SELF || mask&unix.IN_MOVED_FROM == unix.IN_MOVED_FROM {

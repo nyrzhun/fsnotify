@@ -14,17 +14,19 @@ import (
 
 func TestEventStringWithValue(t *testing.T) {
 	for opMask, expectedString := range map[Op]string{
-		Chmod | Create: `"/usr/someFile": CREATE|CHMOD`,
-		Rename:         `"/usr/someFile": RENAME`,
-		Remove:         `"/usr/someFile": REMOVE`,
-		Write | Chmod:  `"/usr/someFile": WRITE|CHMOD`,
+		Chmod | Create:         `"/usr/someFile": CREATE|CHMOD`,
+		Rename:                 `"/usr/someFile": RENAME`,
+		Remove:                 `"/usr/someFile": REMOVE`,
+		Moved:                  `"/usr/someFile": MOVED`,
+		Write | Chmod:          `"/usr/someFile": WRITE|CHMOD`,
 		Chmod | Create | IsDir: `"/usr/someFile": CREATE|CHMOD|ISDIR`,
 	} {
-		event := Event{Name: "/usr/someFile", Op: opMask}
-		if event.String() != expectedString {
-			t.Fatalf("Expected %s, got: %v", expectedString, event.String())
-		}
-
+		t.Run(opMask.String(), func(t *testing.T) {
+			event := Event{Name: "/usr/someFile", Op: opMask}
+			if event.String() != expectedString {
+				t.Fatalf("Expected %s, got: %v", expectedString, event.String())
+			}
+		})
 	}
 }
 
