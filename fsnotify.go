@@ -27,7 +27,7 @@ type Op uint32
 // These are the generalized file operations that can trigger a notification.
 const (
 	Create Op = 1 << iota
-	Moved
+	Move
 	Write
 	Remove
 	Rename
@@ -42,8 +42,8 @@ func (op Op) String() string {
 	if op&Create == Create {
 		buffer.WriteString("|CREATE")
 	}
-	if op&Moved == Moved {
-		buffer.WriteString("|MOVED")
+	if op&Move == Move {
+		buffer.WriteString("|MOVE")
 	}
 	if op&Remove == Remove {
 		buffer.WriteString("|REMOVE")

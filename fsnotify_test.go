@@ -17,7 +17,7 @@ func TestEventStringWithValue(t *testing.T) {
 		Chmod | Create:         `"/usr/someFile": CREATE|CHMOD`,
 		Rename:                 `"/usr/someFile": RENAME`,
 		Remove:                 `"/usr/someFile": REMOVE`,
-		Moved:                  `"/usr/someFile": MOVED`,
+		Move:                  `"/usr/someFile": MOVE`,
 		Write | Chmod:          `"/usr/someFile": WRITE|CHMOD`,
 		Chmod | Create | IsDir: `"/usr/someFile": CREATE|CHMOD|ISDIR`,
 	} {

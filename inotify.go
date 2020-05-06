@@ -269,7 +269,7 @@ func newEvent(name string, mask uint32) Event {
 		e.Op |= Create
 	}
 	if mask&unix.IN_MOVED_TO == unix.IN_MOVED_TO {
-		e.Op |= Moved
+		e.Op |= Move
 	}
 	if mask&unix.IN_DELETE_SELF == unix.IN_DELETE_SELF || mask&unix.IN_DELETE == unix.IN_DELETE {
 		e.Op |= Remove

@@ -678,7 +678,7 @@ func TestFsnotifyRenameToCreate(t *testing.T) {
 		for event := range eventstream {
 			// Only count relevant events
 			if event.Name == filepath.Clean(testDir) || event.Name == filepath.Clean(testFile) || event.Name == filepath.Clean(testFileRenamed) {
-				if event.Op&Create == Create || event.Op&Moved == Moved {
+				if event.Op&Create == Create || event.Op&Move == Move {
 					createReceived.increment()
 				}
 				t.Logf("event received: %s", event)
