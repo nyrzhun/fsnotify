@@ -18,9 +18,11 @@ type FanotifyWatcher struct {
 	Events   chan Event
 	Errors   chan error
 	poller   *fdPoller
+
+	markType uint
 }
 
-func NewFanotifyWatcher() (*FanotifyWatcher, error) {
+func NewFanotifyWatcher(markType uint) (*FanotifyWatcher, error) {
 	fd, err := unix.FanotifyInit(unix.FAN_CLASS_NOTIF, unix.O_RDONLY|unix.O_LARGEFILE)
 	if fd < 0 {
 		return nil, err
@@ -39,6 +41,7 @@ func NewFanotifyWatcher() (*FanotifyWatcher, error) {
 		Events:   make(chan Event),
 		Errors:   make(chan error),
 		poller:   poller,
+		markType: markType,
 	}
 	go fw.readEvents()
 	return fw, nil
@@ -47,7 +50,7 @@ func NewFanotifyWatcher() (*FanotifyWatcher, error) {
 func (fw *FanotifyWatcher) Add(path string) error {
 	err := unix.FanotifyMark(
 		fw.fd,
-		unix.FAN_MARK_ADD|unix.FAN_MARK_MOUNT,
+		unix.FAN_MARK_ADD|fw.markType,
 		unix.FAN_CLOSE_WRITE,
 		unix.AT_FDCWD,
 		path,
