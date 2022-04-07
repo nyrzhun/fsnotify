@@ -12,14 +12,14 @@ import (
 )
 
 type FanotifyWatcher struct {
-	fd       int
+	Fd       int
 	done     chan struct{} // Channel for sending a "quit message" to the reader goroutine
 	doneResp chan struct{} // Channel to respond to Close
 	Events   chan Event
 	Errors   chan error
 	poller   *fdPoller
 
-	markType uint
+	MarkType uint
 }
 
 func NewFanotifyWatcher(markType uint) (*FanotifyWatcher, error) {
@@ -35,28 +35,31 @@ func NewFanotifyWatcher(markType uint) (*FanotifyWatcher, error) {
 	}
 
 	fw := &FanotifyWatcher{
-		fd:       fd,
+		Fd:       fd,
 		done:     make(chan struct{}),
 		doneResp: make(chan struct{}),
 		Events:   make(chan Event),
 		Errors:   make(chan error),
 		poller:   poller,
-		markType: markType,
+		MarkType: markType,
 	}
 	go fw.readEvents()
 	return fw, nil
 }
 
-func (fw *FanotifyWatcher) Add(path string) error {
+func (fw *FanotifyWatcher) Add(path string, mask uint) error {
+	maskF := unix.FAN_MARK_ADD | fw.MarkType | mask
 	err := unix.FanotifyMark(
-		fw.fd,
-		unix.FAN_MARK_ADD|fw.markType,
+		fw.Fd,
+		maskF,
 		unix.FAN_CLOSE_WRITE,
 		unix.AT_FDCWD,
 		path,
 	)
 	if err != nil {
-		log.Printf("unix.FanotifyMark(%d, ..., %s) failed: %s\n", fw.fd, path, err.Error())
+		log.Printf("unix.FanotifyMark(%d, %s|%d|%d=%d, FAN_CLOSE_WRITE, AT_FDCWD, %s) failed: %s\n", fw.Fd,
+			"FAN_MARK_ADD", fw.MarkType, mask, maskF,
+			path, err.Error())
 	}
 	return err
 }
@@ -72,7 +75,7 @@ func (fw *FanotifyWatcher) readEvents() {
 	defer close(fw.doneResp)
 	defer close(fw.Errors)
 	defer close(fw.Events)
-	defer unix.Close(fw.fd)
+	defer unix.Close(fw.Fd)
 	defer fw.poller.close()
 
 	for {
@@ -95,7 +98,7 @@ func (fw *FanotifyWatcher) readEvents() {
 			continue
 		}
 
-		n, errno = unix.Read(fw.fd, buf[:])
+		n, errno = unix.Read(fw.Fd, buf[:])
 		// If a signal interrupted execution, see if we've been asked to close, and try again.
 		// http://man7.org/linux/man-pages/man7/signal.7.html :
 		if errno == unix.EINTR {
