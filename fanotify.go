@@ -17,7 +17,7 @@ type FanotifyWatcher struct {
 	doneResp chan struct{} // Channel to respond to Close
 	Events   chan Event
 	Errors   chan error
-	poller   *fdPoller
+	poller   *FdPoller
 
 	MarkType uint
 }
@@ -28,7 +28,7 @@ func NewFanotifyWatcher(markType uint) (*FanotifyWatcher, error) {
 		return nil, err
 	}
 
-	poller, err := newFdPoller(fd)
+	poller, err := NewFdPoller(fd)
 	if err != nil {
 		_ = unix.Close(fd)
 		return nil, err
@@ -76,7 +76,7 @@ func (fw *FanotifyWatcher) readEvents() {
 	defer close(fw.Errors)
 	defer close(fw.Events)
 	defer unix.Close(fw.Fd)
-	defer fw.poller.close()
+	defer fw.poller.Close()
 
 	for {
 		// See if we have been closed.
@@ -84,7 +84,7 @@ func (fw *FanotifyWatcher) readEvents() {
 			return
 		}
 
-		ok, errno = fw.poller.wait()
+		ok, errno = fw.poller.Wait()
 		if errno != nil {
 			select {
 			case fw.Errors <- errno:
@@ -183,7 +183,7 @@ func (fw *FanotifyWatcher) Close() error {
 	close(fw.done)
 
 	// Wake up goroutine
-	_ = fw.poller.wake()
+	_ = fw.poller.Wake()
 
 	// Wait for goroutine to close
 	<-fw.doneResp
