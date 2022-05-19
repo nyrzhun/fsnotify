@@ -1,4 +1,4 @@
-module github.com/dbaynak-cl/fsnotify
+module github.com/cloudlinux/fsnotify
 
 go 1.13
 
