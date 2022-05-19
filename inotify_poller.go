@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build linux
 // +build linux
 
 package fsnotify
@@ -12,14 +13,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type fdPoller struct {
+type FdPoller struct {
 	fd   int    // File descriptor (as returned by the inotify_init() syscall)
 	epfd int    // Epoll file descriptor
 	pipe [2]int // Pipe for waking up
 }
 
-func emptyPoller(fd int) *fdPoller {
-	poller := new(fdPoller)
+func emptyPoller(fd int) *FdPoller {
+	poller := new(FdPoller)
 	poller.fd = fd
 	poller.epfd = -1
 	poller.pipe[0] = -1
@@ -29,12 +30,12 @@ func emptyPoller(fd int) *fdPoller {
 
 // Create a new inotify poller.
 // This creates an inotify handler, and an epoll handler.
-func newFdPoller(fd int) (*fdPoller, error) {
+func NewFdPoller(fd int) (*FdPoller, error) {
 	var errno error
 	poller := emptyPoller(fd)
 	defer func() {
 		if errno != nil {
-			poller.close()
+			poller.Close()
 		}
 	}()
 	poller.fd = fd
@@ -76,7 +77,7 @@ func newFdPoller(fd int) (*fdPoller, error) {
 // Wait using epoll.
 // Returns true if something is ready to be read,
 // false if there is not.
-func (poller *fdPoller) wait() (bool, error) {
+func (poller *FdPoller) Wait() (bool, error) {
 	// 3 possible events per fd, and 2 fds, makes a maximum of 6 events.
 	// I don't know whether epoll_wait returns the number of events returned,
 	// or the total number of events ready.
@@ -146,7 +147,7 @@ func (poller *fdPoller) wait() (bool, error) {
 }
 
 // Close the write end of the poller.
-func (poller *fdPoller) wake() error {
+func (poller *FdPoller) Wake() error {
 	buf := make([]byte, 1)
 	n, errno := unix.Write(poller.pipe[1], buf)
 	if n == -1 {
@@ -159,7 +160,7 @@ func (poller *fdPoller) wake() error {
 	return nil
 }
 
-func (poller *fdPoller) clearWake() error {
+func (poller *FdPoller) clearWake() error {
 	// You have to be woken up a LOT in order to get to 100!
 	buf := make([]byte, 100)
 	n, errno := unix.Read(poller.pipe[0], buf)
@@ -174,14 +175,21 @@ func (poller *fdPoller) clearWake() error {
 }
 
 // Close all poller file descriptors, but not the one passed to it.
-func (poller *fdPoller) close() {
+func (poller *FdPoller) Close() (err error) {
 	if poller.pipe[1] != -1 {
-		unix.Close(poller.pipe[1])
+		if err1 := unix.Close(poller.pipe[1]); err1 != nil {
+			err = err1
+		}
 	}
 	if poller.pipe[0] != -1 {
-		unix.Close(poller.pipe[0])
+		if err1 := unix.Close(poller.pipe[0]); err1 != nil {
+			err = err1
+		}
 	}
 	if poller.epfd != -1 {
-		unix.Close(poller.epfd)
+		if err1 := unix.Close(poller.epfd); err1 != nil {
+			err = err1
+		}
 	}
+	return
 }

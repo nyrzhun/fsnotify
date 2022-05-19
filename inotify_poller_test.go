@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build linux
 // +build linux
 
 package fsnotify
@@ -56,9 +57,9 @@ func (tfd testFd) close() {
 	unix.Close(tfd[0])
 }
 
-func makePoller(t *testing.T) (testFd, *fdPoller) {
+func makePoller(t *testing.T) (testFd, *FdPoller) {
 	tfd := makeTestFd(t)
-	poller, err := newFdPoller(tfd.fd())
+	poller, err := NewFdPoller(tfd.fd())
 	if err != nil {
 		t.Fatalf("Failed to create poller: %v", err)
 	}
@@ -66,7 +67,7 @@ func makePoller(t *testing.T) (testFd, *fdPoller) {
 }
 
 func TestPollerWithBadFd(t *testing.T) {
-	_, err := newFdPoller(-1)
+	_, err := NewFdPoller(-1)
 	if err != unix.EBADF {
 		t.Fatalf("Expected EBADF, got: %v", err)
 	}
@@ -75,10 +76,10 @@ func TestPollerWithBadFd(t *testing.T) {
 func TestPollerWithData(t *testing.T) {
 	tfd, poller := makePoller(t)
 	defer tfd.close()
-	defer poller.close()
+	defer poller.Close()
 
 	tfd.put(t)
-	ok, err := poller.wait()
+	ok, err := poller.Wait()
 	if err != nil {
 		t.Fatalf("poller failed: %v", err)
 	}
@@ -91,13 +92,13 @@ func TestPollerWithData(t *testing.T) {
 func TestPollerWithWakeup(t *testing.T) {
 	tfd, poller := makePoller(t)
 	defer tfd.close()
-	defer poller.close()
+	defer poller.Close()
 
-	err := poller.wake()
+	err := poller.Wake()
 	if err != nil {
 		t.Fatalf("wake failed: %v", err)
 	}
-	ok, err := poller.wait()
+	ok, err := poller.Wait()
 	if err != nil {
 		t.Fatalf("poller failed: %v", err)
 	}
@@ -109,10 +110,10 @@ func TestPollerWithWakeup(t *testing.T) {
 func TestPollerWithClose(t *testing.T) {
 	tfd, poller := makePoller(t)
 	defer tfd.close()
-	defer poller.close()
+	defer poller.Close()
 
 	tfd.closeWrite(t)
-	ok, err := poller.wait()
+	ok, err := poller.Wait()
 	if err != nil {
 		t.Fatalf("poller failed: %v", err)
 	}
@@ -124,16 +125,16 @@ func TestPollerWithClose(t *testing.T) {
 func TestPollerWithWakeupAndData(t *testing.T) {
 	tfd, poller := makePoller(t)
 	defer tfd.close()
-	defer poller.close()
+	defer poller.Close()
 
 	tfd.put(t)
-	err := poller.wake()
+	err := poller.Wake()
 	if err != nil {
 		t.Fatalf("wake failed: %v", err)
 	}
 
 	// both data and wakeup
-	ok, err := poller.wait()
+	ok, err := poller.Wait()
 	if err != nil {
 		t.Fatalf("poller failed: %v", err)
 	}
@@ -142,7 +143,7 @@ func TestPollerWithWakeupAndData(t *testing.T) {
 	}
 
 	// data is still in the buffer, wakeup is cleared
-	ok, err = poller.wait()
+	ok, err = poller.Wait()
 	if err != nil {
 		t.Fatalf("poller failed: %v", err)
 	}
@@ -152,11 +153,11 @@ func TestPollerWithWakeupAndData(t *testing.T) {
 
 	tfd.get(t)
 	// data is gone, only wakeup now
-	err = poller.wake()
+	err = poller.Wake()
 	if err != nil {
 		t.Fatalf("wake failed: %v", err)
 	}
-	ok, err = poller.wait()
+	ok, err = poller.Wait()
 	if err != nil {
 		t.Fatalf("poller failed: %v", err)
 	}
@@ -168,7 +169,7 @@ func TestPollerWithWakeupAndData(t *testing.T) {
 func TestPollerConcurrent(t *testing.T) {
 	tfd, poller := makePoller(t)
 	defer tfd.close()
-	defer poller.close()
+	defer poller.Close()
 
 	oks := make(chan bool)
 	live := make(chan bool)
@@ -176,7 +177,7 @@ func TestPollerConcurrent(t *testing.T) {
 	go func() {
 		defer close(oks)
 		for {
-			ok, err := poller.wait()
+			ok, err := poller.Wait()
 			if err != nil {
 				t.Fatalf("poller failed: %v", err)
 			}
@@ -206,7 +207,7 @@ func TestPollerConcurrent(t *testing.T) {
 	case <-oks:
 		t.Fatalf("poller did not wait")
 	}
-	err := poller.wake()
+	err := poller.Wake()
 	if err != nil {
 		t.Fatalf("wake failed: %v", err)
 	}

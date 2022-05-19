@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build linux
 // +build linux
 
 package fsnotify
@@ -28,7 +29,7 @@ type Watcher struct {
 	Errors   chan error
 	mu       sync.Mutex // Map access
 	fd       int
-	poller   *fdPoller
+	poller   *FdPoller
 	paths    map[int]string // Map of watched paths (key: watch descriptor)
 	done     chan struct{}  // Channel for sending a "quit message" to the reader goroutine
 	doneResp chan struct{}  // Channel to respond to Close
@@ -43,7 +44,7 @@ func NewWatcher(flags uint32) (*Watcher, error) {
 		return nil, errno
 	}
 	// Create epoll
-	poller, err := newFdPoller(fd)
+	poller, err := NewFdPoller(fd)
 	if err != nil {
 		unix.Close(fd)
 		return nil, err
@@ -82,7 +83,7 @@ func (w *Watcher) Close() error {
 	close(w.done)
 
 	// Wake up goroutine
-	w.poller.wake()
+	w.poller.Wake()
 
 	// Wait for goroutine to close
 	<-w.doneResp
@@ -129,7 +130,7 @@ func (w *Watcher) readEvents() {
 	defer close(w.Errors)
 	defer close(w.Events)
 	defer unix.Close(w.fd)
-	defer w.poller.close()
+	defer w.poller.Close()
 
 	for {
 		// See if we have been closed.
@@ -137,7 +138,7 @@ func (w *Watcher) readEvents() {
 			return
 		}
 
-		ok, errno = w.poller.wait()
+		ok, errno = w.poller.Wait()
 		if errno != nil {
 			select {
 			case w.Errors <- errno:
